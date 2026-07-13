@@ -1,0 +1,24 @@
+# ## Python
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/
+.env
+
+# ## Carpeta de scaffold obsoleta (no forma parte del proyecto)
+mi-perfil-ods/
+
+# ## Bases de datos locales (se regeneran solas)
+*.db
+*.db-wal
+*.db-shm
+
+# ## Node / Next.js
+node_modules/
+.next/
+out/
+
+# ## Sistema
+.DS_Store
+Thumbs.db

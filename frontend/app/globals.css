@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background: #f7f8fc;
+  color: #1f1147;
+}
+
+@layer components {
+  /* ## Tarjeta premium reutilizable: glassmorphism sutil + sombra elevada */
+  .card-premium {
+    @apply bg-white/80 backdrop-blur-sm border border-brand-100 rounded-2xl shadow-lift transition-all duration-300;
+  }
+
+  /* ## Botón primario de marca */
+  .btn-primary {
+    @apply bg-brand-600 text-white font-semibold px-6 py-3 rounded-xl shadow-lift hover:scale-[1.02] active:scale-100 transition-transform duration-200 ease-ios;
+  }
+
+  /* ## Badge de disclaimer regulatorio — siempre visible, nunca letra pequeña */
+  .disclaimer-banner {
+    @apply bg-amber-50 border border-amber-300 text-amber-800 text-sm rounded-xl px-4 py-3;
+  }
+}

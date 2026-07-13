@@ -1,0 +1,173 @@
+# =============================================================================
+# REGLAS DE PERFILAMIENTO DE RIESGO — versión 1.1.0
+# Odds Ratio | Track 3: Robo-Advisory | Agentic Scale 2026
+#
+# TRANSPARENCIA TOTAL: estas reglas son visibles, versionadas y auditables.
+# Cada decisión de perfil registra qué versión de reglas se usó.
+# El LLM NUNCA participa en el cálculo del perfil — solo estas reglas + Bayes.
+#
+# v1.1.0: se amplía de 6 a 10 preguntas OBLIGATORIAS (todas puntúan el score)
+# + 1 pregunta OPCIONAL de retroalimentación metodológica (nunca puntúa,
+# alimenta el muestreo intencional de casos críticos — ver app/rules/estratos.py).
+# Score máximo: 100 (antes 60) — umbrales de perfil reescalados proporcionalmente.
+# =============================================================================
+version: "1.1.0"
+fecha: "2026-07-12"
+autor: "Equipo Odds Ratio — Dataclub ESPOL"
+
+preguntas:
+  edad:
+    texto: "¿Cuál es tu rango de edad?"
+    opciones:
+      a: { texto: "18 a 30 años",     puntos: 10, explicacion: "Mayor horizonte de vida permite asumir más volatilidad." }
+      b: { texto: "31 a 45 años",     puntos: 7,  explicacion: "Horizonte medio: balance entre crecimiento y estabilidad." }
+      c: { texto: "46 a 60 años",     puntos: 4,  explicacion: "Cercanía al retiro sugiere reducir exposición a riesgo." }
+      d: { texto: "Más de 60 años",   puntos: 1,  explicacion: "Preservación de capital es prioritaria en esta etapa." }
+
+  horizonte:
+    texto: "¿En cuánto tiempo planeas usar este dinero?"
+    opciones:
+      a: { texto: "Menos de 1 año",   puntos: 1,  explicacion: "Horizonte corto exige liquidez y baja volatilidad." }
+      b: { texto: "1 a 3 años",       puntos: 4,  explicacion: "Horizonte corto-medio limita la exposición a renta variable." }
+      c: { texto: "3 a 7 años",       puntos: 7,  explicacion: "Horizonte medio permite tolerar ciclos de mercado." }
+      d: { texto: "Más de 7 años",    puntos: 10, explicacion: "Horizonte largo favorece activos de crecimiento." }
+
+  tolerancia_caida:
+    texto: "Si tu portafolio cae 15% en un mes, ¿qué harías?"
+    opciones:
+      a: { texto: "Vendo todo inmediatamente",        puntos: 1,  explicacion: "Aversión alta a pérdidas: perfil defensivo." }
+      b: { texto: "Vendo una parte",                  puntos: 4,  explicacion: "Tolerancia parcial a la volatilidad." }
+      c: { texto: "Mantengo mi posición",             puntos: 7,  explicacion: "Tolerancia sólida: entiende ciclos de mercado." }
+      d: { texto: "Compro más aprovechando el precio", puntos: 10, explicacion: "Alta tolerancia y visión contraria: perfil agresivo." }
+
+  experiencia:
+    texto: "¿Cuál es tu experiencia previa invirtiendo?"
+    opciones:
+      a: { texto: "Ninguna",                              puntos: 1,  explicacion: "Sin experiencia: conviene empezar conservador." }
+      b: { texto: "Depósitos a plazo / pólizas",          puntos: 4,  explicacion: "Experiencia en renta fija local." }
+      c: { texto: "Fondos de inversión o acciones",       puntos: 7,  explicacion: "Conoce instrumentos de mercado de valores." }
+      d: { texto: "Derivados, cripto o trading activo",   puntos: 10, explicacion: "Experiencia en instrumentos de alto riesgo." }
+
+  proporcion_patrimonio:
+    texto: "¿Qué proporción de tus ahorros representa esta inversión?"
+    opciones:
+      a: { texto: "Más del 75%",  puntos: 1,  explicacion: "Concentración alta del patrimonio exige prudencia." }
+      b: { texto: "50% a 75%",    puntos: 4,  explicacion: "Proporción significativa: moderar el riesgo." }
+      c: { texto: "25% a 50%",    puntos: 7,  explicacion: "Diversificación patrimonial razonable." }
+      d: { texto: "Menos del 25%", puntos: 10, explicacion: "Capital marginal permite mayor tolerancia a pérdidas." }
+
+  ingresos:
+    texto: "¿Cómo describirías la estabilidad de tus ingresos?"
+    opciones:
+      a: { texto: "Inestables o variables",       puntos: 2,  explicacion: "Ingresos variables requieren colchón de liquidez." }
+      b: { texto: "Estables, sin capacidad de ahorro extra", puntos: 5, explicacion: "Estabilidad sin holgura: riesgo moderado." }
+      c: { texto: "Estables con ahorro mensual",  puntos: 8,  explicacion: "Capacidad de ahorro sostiene estrategia de largo plazo." }
+      d: { texto: "Altos y crecientes",           puntos: 10, explicacion: "Holgura financiera amplía la capacidad de riesgo." }
+
+  # ---------------------------------------------------------------------------
+  # v1.1.0 — 4 preguntas que completan las 10 obligatorias.
+  # ---------------------------------------------------------------------------
+  objetivo_financiero:
+    texto: "¿Cuál es el objetivo principal de esta inversión?"
+    opciones:
+      a: { texto: "Preservar mi capital o tener un fondo de emergencia", puntos: 1,  explicacion: "Objetivo de preservación: prioriza liquidez y bajo riesgo." }
+      b: { texto: "Una meta a mediano plazo (vivienda, estudios)",       puntos: 4,  explicacion: "Meta con fecha definida: riesgo moderado y horizonte acotado." }
+      c: { texto: "Hacer crecer mi patrimonio a largo plazo",            puntos: 7,  explicacion: "Crecimiento sin fecha fija: tolera más volatilidad en el camino." }
+      d: { texto: "Mi jubilación, con horizonte de 15+ años",            puntos: 10, explicacion: "Horizonte muy largo: históricamente tolera la mayor exposición a riesgo." }
+
+  conocimiento_financiero:
+    texto: "¿Cómo describirías tu conocimiento de conceptos financieros?"
+    opciones:
+      a: { texto: "Básico: términos como \"volatilidad\" o \"diversificación\" me son ajenos", puntos: 1,  explicacion: "Bajo conocimiento: conviene una cartera simple y bien explicada." }
+      b: { texto: "Intermedio: entiendo lo esencial, no sigo mercados a detalle",               puntos: 4,  explicacion: "Conocimiento funcional: tolera algo más de complejidad." }
+      c: { texto: "Avanzado: sigo mercados e indicadores con regularidad",                      puntos: 7,  explicacion: "Buen entendimiento: tolera instrumentos más sofisticados." }
+      d: { texto: "Experto: he gestionado inversiones propias o profesionales",                puntos: 10, explicacion: "Alta alfabetización financiera: entiende y asume mejor la volatilidad." }
+
+  capacidad_inversion:
+    texto: "¿Qué rango representa tu ingreso mensual o tu capacidad de inversión?"
+    opciones:
+      a: { texto: "Menos de $500",        puntos: 1,  explicacion: "Capacidad económica limitada: prioriza prudencia y liquidez.", segmento_saldo: "bajo" }
+      b: { texto: "$500 a $2,000",        puntos: 4,  explicacion: "Capacidad económica media: riesgo moderado sostenible.", segmento_saldo: "medio" }
+      c: { texto: "$2,000 a $5,000",      puntos: 7,  explicacion: "Capacidad económica alta: mayor margen para asumir riesgo.", segmento_saldo: "alto" }
+      d: { texto: "Más de $5,000",        puntos: 10, explicacion: "Capacidad económica muy alta: mayor holgura ante la volatilidad.", segmento_saldo: "muy_alto" }
+
+  perdida_sostenida:
+    texto: "Si tu portafolio se mantiene en pérdida por 6 meses o más, ¿qué harías?"
+    opciones:
+      a: { texto: "Retiro todo mi dinero para evitar más pérdidas", puntos: 1,  explicacion: "Baja tolerancia a pérdidas prolongadas: perfil defensivo." }
+      b: { texto: "Retiro una parte y espero estabilidad",          puntos: 4,  explicacion: "Tolerancia parcial ante pérdidas sostenidas." }
+      c: { texto: "Mantengo mi estrategia sin cambios",             puntos: 7,  explicacion: "Consistencia conductual: no reacciona por ruido de corto plazo." }
+      d: { texto: "Aumento mis aportes aprovechando precios bajos", puntos: 10, explicacion: "Alta convicción y disciplina de largo plazo." }
+
+# ---------------------------------------------------------------------------
+# PREGUNTA OPCIONAL — NO puntúa, NO participa en el cálculo del perfil.
+# Alimenta el MUESTREO INTENCIONAL de casos críticos (retroalimentación
+# metodológica cualitativa) — ver app/rules/estratos.py y
+# GET /review/quality-report para cómo se usa esta información.
+# ---------------------------------------------------------------------------
+pregunta_opcional:
+  id: "retroalimentacion_general"
+  texto: "Opcional: ¿qué aspectos crees que deberíamos evaluar en los inversionistas? ¿Alguna de estas preguntas te pareció confusa?"
+  placeholder: "Tu opinión nos ayuda a mejorar el cuestionario para todos (opcional)…"
+
+# Score máximo posible: 100 puntos (10 preguntas × 10 puntos máx.)
+perfiles:
+  conservador: { min: 0,  max: 40, descripcion: "Prioriza preservar capital. Mayoría en renta fija y liquidez." }
+  moderado:    { min: 41, max: 73, descripcion: "Balance entre crecimiento y estabilidad. Mixto renta fija/variable." }
+  agresivo:    { min: 74, max: 100, descripcion: "Busca crecimiento de largo plazo. Mayoría en renta variable." }
+
+# Distribución objetivo por perfil (clase de activo -> %)
+asignaciones:
+  conservador:
+    efectivo: 15
+    renta_fija_local: 50
+    renta_fija_internacional: 20
+    fondos_indexados: 10
+    acciones: 5
+  moderado:
+    efectivo: 10
+    renta_fija_local: 30
+    renta_fija_internacional: 20
+    fondos_indexados: 25
+    acciones: 15
+  agresivo:
+    efectivo: 5
+    renta_fija_local: 15
+    renta_fija_internacional: 10
+    fondos_indexados: 35
+    acciones: 35
+
+# WORKFLOW CUMPLIMIENTO/RIESGOS: umbrales de concentración por clase.
+# Si una clase excede su umbral, se genera ALERTA (nunca bloqueo automático).
+cumplimiento:
+  umbrales_concentracion:
+    efectivo: 40
+    renta_fija_local: 60
+    renta_fija_internacional: 40
+    fondos_indexados: 50
+    acciones: 45
+  nota: >
+    Las alertas quedan como flag para revisión del área de Cumplimiento.
+    El sistema NUNCA bloquea ni ejecuta acciones automáticamente.
+
+# ---------------------------------------------------------------------------
+# ESTRATOS DE MUESTREO — Historia 1, infraestructura de muestreo estratificado.
+# Clasifican al inversionista de forma DETERMINÍSTICA a partir de respuestas
+# ya recolectadas (nunca se pregunta dos veces). Permiten extraer submuestras
+# proporcionales por segmento y calcular métricas de calidad (Alfa de
+# Cronbach, índices de discriminación) sin sesgo de grupo.
+# Ver app/rules/estratos.py para la implementación.
+# ---------------------------------------------------------------------------
+estratos:
+  estrato_a_edad:
+    fuente: "edad"
+    joven: ["a", "b"]           # 18-45 años
+    adulto_mayor: ["c", "d"]    # 46+ años
+  estrato_b_saldo:
+    fuente: "capacidad_inversion"
+    # el segmento_saldo de cada opción ya está definido arriba (bajo/medio/alto/muy_alto)
+  estrato_c_experiencia:
+    fuente: "experiencia"
+    principiante: ["a"]
+    intermedio: ["b", "c"]
+    avanzado: ["d"]

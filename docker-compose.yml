@@ -1,0 +1,41 @@
+# ## ==========================================================================
+# ## docker-compose.yml — Despliegue completo de Odds Ratio en cualquier VM
+# ## Uso:  docker compose up -d --build
+# ## Backend en :8000 | Frontend en :3000 | SQLite persistido en volumen
+# ## ==========================================================================
+services:
+
+  # ## ---------- Backend: FastAPI + LangGraph + Bayes ----------
+  backend:
+    build: ./backend                     # ## construye desde backend/Dockerfile
+    ports:
+      - "8000:8000"                      # ## expone la API REST
+    environment:
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}   # ## gemini | mock (fallback automático)
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}     # ## API key del premio "Best Use of Gemini"
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - ODDS_RATIO_DB=sqlite:////data/odds_ratio.db          # ## BD en el volumen
+      - LANGGRAPH_CHECKPOINT_DB=/data/langgraph_checkpoints.db # ## checkpoints del grafo
+      - OPERATOR_USER=${OPERATOR_USER:-operador}             # ## credenciales del panel
+      - OPERATOR_PASS=${OPERATOR_PASS:-oddsratio2026}        # ## (cambiar en producción)
+    volumes:
+      - odds_data:/data                  # ## SQLite SOBREVIVE reinicios del contenedor
+    restart: unless-stopped              # ## resiliencia en la VM
+
+  # ## ---------- Frontend: Next.js 14 ----------
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # ## URL pública del backend que el NAVEGADOR usará (cambiar por la IP
+        # ## o dominio de tu VM al desplegar, ej. http://161.35.104.41:8000)
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    ports:
+      - "3000:3000"                      # ## expone la web
+    depends_on:
+      - backend                          # ## arranca después de la API
+    restart: unless-stopped
+
+# ## Volumen nombrado: persistencia de la base de datos y los checkpoints
+volumes:
+  odds_data:

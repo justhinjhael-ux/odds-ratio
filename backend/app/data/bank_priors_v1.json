@@ -1,0 +1,37 @@
+{
+  "_meta": {
+    "version": "bank-priors-v1",
+    "descripcion": "Priors del modelo Normal-Normal anclados a cómo la banca reinvierte los depósitos de sus clientes: mantiene un encaje (~5%) y reinvierte el resto (~75%) en cartera de crédito e inversiones, ganando el spread entre la tasa activa (~9.5% anual, lo que cobra al prestar) y la tasa pasiva (~5.5% anual, lo que paga al captar).",
+    "encaje_referencial": 0.05,
+    "reinversion_referencial": 0.75,
+    "tasa_pasiva_anual_referencial": 0.055,
+    "tasa_activa_anual_referencial": 0.095
+  },
+  "priors": {
+    "efectivo": {
+      "mu0_mensual": 0.0015,
+      "tau0": 0.005,
+      "justificacion": "Proxy de liquidez/encaje bancario: retorno mínimo, casi sin varianza."
+    },
+    "renta_fija_local": {
+      "mu0_mensual": 0.0046,
+      "tau0": 0.008,
+      "justificacion": "Anclado a la tasa pasiva mensual (~5.5%/12): lo que el banco paga por captar depósitos."
+    },
+    "renta_fija_internacional": {
+      "mu0_mensual": 0.0035,
+      "tau0": 0.010,
+      "justificacion": "Renta fija diversificada internacionalmente: retorno moderado, algo más de varianza cambiaria."
+    },
+    "fondos_indexados": {
+      "mu0_mensual": 0.0060,
+      "tau0": 0.020,
+      "justificacion": "Prima de riesgo intermedia entre renta fija y renta variable concentrada."
+    },
+    "acciones": {
+      "mu0_mensual": 0.0079,
+      "tau0": 0.035,
+      "justificacion": "Anclado a la tasa activa mensual (~9.5%/12): lo que el banco cobra al colocar crédito/riesgo."
+    }
+  }
+}
