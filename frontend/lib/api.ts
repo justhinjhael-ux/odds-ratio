@@ -59,14 +59,31 @@ export interface FanChartPoint {
   p95: number;
 }
 
+// ## Un bin del histograma del valor final simulado (base de la ojiva)
+export interface HistogramaBin {
+  bin_inicio: number;
+  bin_fin: number;
+  frecuencia: number;
+  frecuencia_acumulada_pct: number;
+}
+
 export interface Proyeccion {
   monto_inicial: number;
   horizonte_meses: number;
   retorno_mensual_esperado: number;
   volatilidad_mensual: number;
   fan_chart: FanChartPoint[];
+  histograma_valor_final: HistogramaBin[];
+  prob_perdida_capital_pct: number;
+  n_simulaciones: number;
   modelo: string;
   disclaimer: string;
+}
+
+export interface CorrelationMatrix {
+  clases: string[];
+  matriz: number[][];
+  version: string;
 }
 
 // ## Una clase de activo dentro de la distribución propuesta
@@ -92,6 +109,8 @@ export interface Proposal {
   thread_id?: string;
   perfil: string;
   confianza: number;
+  score?: number | null;
+  influencias?: { pregunta: string; respuesta: string; puntos: number; explicacion: string }[];
   distribucion: AllocationItem[] | DistribucionEditada;
   proyeccion: Proyeccion;
   explicacion: string;
@@ -239,6 +258,7 @@ export const getProposal = (id: number) => request<Proposal>(`/proposals/${id}`)
 // ## ---------- Forecast / Markowitz ----------
 export const getAssetClasses = () => request<{ clases: Record<string, any> }>("/forecast/asset-classes");
 export const getMarkowitz = (perfil: string) => request<MarkowitzResult>(`/forecast/markowitz/${perfil}`);
+export const getCorrelacion = () => request<CorrelationMatrix>("/forecast/correlacion");
 
 // ## ---------- Panel Operativo (protegido) ----------
 export const login = (usuario: string, clave: string) =>

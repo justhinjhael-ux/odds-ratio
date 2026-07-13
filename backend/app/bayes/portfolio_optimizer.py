@@ -90,6 +90,23 @@ def covariance_matrix_riesgo() -> tuple:
     return tuple(map(tuple, sigma))  # hashable para cachear
 
 
+def correlation_matrix() -> dict:
+    """Matriz de correlación REAL (normalizada de Σ_riesgo) entre clases de
+    activo riesgosas — insumo honesto para un mapa de calor: correlación de
+    Pearson empírica, no un dato inventado. ρ_ij = Σ_ij / (σ_i · σ_j).
+    """
+    clases = _clases_riesgosas()
+    sigma = np.array(covariance_matrix_riesgo())
+    desv = np.sqrt(np.diag(sigma))
+    corr = sigma / np.outer(desv, desv)
+    corr = np.clip(corr, -1.0, 1.0)
+    return {
+        "clases": clases,
+        "matriz": [[round(float(v), 4) for v in fila] for fila in corr],
+        "version": OPTIMIZER_VERSION,
+    }
+
+
 def tangency_portfolio() -> dict:
     """Cartera tangente long-only entre activos riesgosos (Paso 1).
 

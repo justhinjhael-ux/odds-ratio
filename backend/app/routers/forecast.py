@@ -31,3 +31,10 @@ def markowitz(perfil: str):
     if perfil not in portfolio_optimizer.RISK_AVERSION:
         raise HTTPException(status_code=404, detail=f"Perfil desconocido: {perfil}")
     return portfolio_optimizer.optimize_for_profile(perfil)
+
+
+@router.get("/correlacion")
+def correlacion():
+    """Matriz de correlación real entre clases de activo — insumo del mapa
+    de calor (misma covarianza empírica que usa Markowitz)."""
+    return portfolio_optimizer.correlation_matrix()

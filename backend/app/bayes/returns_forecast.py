@@ -152,12 +152,33 @@ def forecast_portfolio(
             }
         )
 
+    # Distribución empírica del valor final (histograma + frecuencia acumulada
+    # = OJIVA estadística) — se extrae de las MISMAS n_sims trayectorias ya
+    # simuladas arriba, ningún dato nuevo se inventa.
+    valor_final = trayectorias[:, -1]
+    counts, edges = np.histogram(valor_final, bins=12)
+    acumulado = 0
+    histograma_valor_final = []
+    for i in range(len(counts)):
+        acumulado += int(counts[i])
+        histograma_valor_final.append(
+            {
+                "bin_inicio": round(float(edges[i]), 2),
+                "bin_fin": round(float(edges[i + 1]), 2),
+                "frecuencia": int(counts[i]),
+                "frecuencia_acumulada_pct": round(100 * acumulado / n_sims, 2),
+            }
+        )
+    prob_perdida_capital = round(100 * float((valor_final < monto_inicial).mean()), 2)
+
     return {
         "monto_inicial": monto_inicial,
         "horizonte_meses": horizonte_meses,
         "retorno_mensual_esperado": round(mu_port, 6),
         "volatilidad_mensual": round(float(np.sqrt(var_port)), 6),
         "fan_chart": fan_chart,
+        "histograma_valor_final": histograma_valor_final,
+        "prob_perdida_capital_pct": prob_perdida_capital,
         "modelo": FORECAST_VERSION,
         "n_simulaciones": n_sims,
         "disclaimer": DISCLAIMER,

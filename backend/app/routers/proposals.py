@@ -3,14 +3,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Proposal
+from app.models import Proposal, RiskProfileRecord
 from app.schemas import QuestionnaireIn
 from app.workflows.asesoria_workflow import start_advisory
 
 router = APIRouter(prefix="/proposals", tags=["proposals"])
 
 
-def _serialize(p: Proposal) -> dict:
+def _serialize(db: Session, p: Proposal) -> dict:
+    registro = db.query(RiskProfileRecord).filter_by(proposal_id=p.id).one_or_none()
     return {
         "proposal_id": p.id,
         "client_id": p.client_id,
@@ -26,6 +27,8 @@ def _serialize(p: Proposal) -> dict:
         "guardrail_activado": p.guardrail_activado,
         "llm_provider": p.llm_provider,
         "alerta_cumplimiento": p.alerta_cumplimiento,
+        "score": registro.score if registro else None,
+        "influencias": registro.detalle.get("influencias", []) if registro else [],
         "created_at": p.created_at.isoformat() if p.created_at else None,
     }
 
@@ -50,9 +53,9 @@ def get_proposal(proposal_id: int, db: Session = Depends(get_db)):
     p = db.get(Proposal, proposal_id)
     if p is None:
         raise HTTPException(status_code=404, detail="Propuesta no encontrada")
-    return _serialize(p)
+    return _serialize(db, p)
 
 
 @router.get("")
 def list_proposals(db: Session = Depends(get_db)):
-    return [_serialize(p) for p in db.query(Proposal).order_by(Proposal.id.desc()).all()]
+    return [_serialize(db, p) for p in db.query(Proposal).order_by(Proposal.id.desc()).all()]

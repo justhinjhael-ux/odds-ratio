@@ -1,0 +1,49 @@
+# ## Auto-despliegue de Odds Ratio a jbstrategybusiness.com/odds
+# ## Cada push a main compila el frontend y despliega frontend+backend al VPS.
+name: Deploy Odds Ratio
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend (standalone)
+        working-directory: frontend
+        env:
+          NEXT_PUBLIC_BASE_PATH: /odds
+          NEXT_PUBLIC_API_URL: https://jbstrategybusiness.com/odds-api
+        run: |
+          npm ci
+          npm run build
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -r public .next/standalone/public; fi
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Desplegar frontend
+        run: |
+          rsync -az --delete -e "ssh -i ~/.ssh/deploy_key" \
+            frontend/.next/standalone/ root@${{ secrets.VPS_HOST }}:/opt/odds/frontend/
+
+      - name: Desplegar backend + reiniciar servicios
+        run: |
+          rsync -az --exclude='.venv' --exclude='__pycache__' --exclude='.pytest_cache' \
+            --exclude='*.db' --exclude='*.db-shm' --exclude='*.db-wal' \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            backend/ root@${{ secrets.VPS_HOST }}:/opt/odds/backend/
+          ssh -i ~/.ssh/deploy_key root@${{ secrets.VPS_HOST }} 'bash /opt/odds/redeploy.sh'
