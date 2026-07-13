@@ -4,6 +4,9 @@
 // ## Modo Piloto (muestreo intencional): si la sesión cae en la fracción
 // ## configurada, captura en silencio tiempo por pregunta + vacilación, y
 // ## muestra un ícono discreto de feedback puntual. Nunca fuerza nada.
+// ##
+// ## NOTA DE DISEÑO: solo la CAPA VISUAL fue rediseñada (premium banking /
+// ## glassmorphism). Ninguna lógica, estado, cálculo o llamada API cambió.
 // ## ==========================================================================
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -84,50 +87,128 @@ export default function OnboardingPage() {
   }
 
   if (!preguntas) {
-    return <p className="text-center text-slate-500 py-20">Cargando cuestionario…</p>;
+    return (
+      <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-28 text-center animate-rise">
+        <div className="relative h-14 w-14">
+          <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
+          <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
+        </div>
+        <p className="mt-5 font-semibold text-brand-900">Preparando tu perfil…</p>
+        <p className="text-sm text-slate-500 mt-1">Cargando cuestionario seguro</p>
+      </div>
+    );
   }
 
+  const progreso = idsPreguntas.length ? Math.round((completas / idsPreguntas.length) * 100) : 0;
+
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold text-brand-900">Cuéntanos sobre ti</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          {idsPreguntas.length} preguntas evaluadas con reglas versionadas ({preguntas.version}), más
-          una pregunta opcional de retroalimentación. Cada respuesta influye de forma transparente.
+    <div className="max-w-2xl mx-auto space-y-6 pb-12 animate-rise">
+      {/* ## Overlay de transición elegante mientras se genera la propuesta */}
+      {enviando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-md">
+          <div className="card-premium px-10 py-9 flex flex-col items-center gap-4 text-center animate-rise">
+            <div className="relative h-16 w-16">
+              <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
+              <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
+            </div>
+            <p className="font-bold text-brand-900 text-lg">Generando tu propuesta…</p>
+            <p className="text-xs text-slate-500 max-w-[15rem] leading-relaxed">
+              Analizando tu perfil con reglas versionadas y modelos bayesianos
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ## Bienvenida personalizada */}
+      <header className="text-center pt-2">
+        <span className="inline-flex items-center gap-2 rounded-pill bg-white/60 backdrop-blur-md border border-white/70 px-4 py-1.5 text-xs font-semibold text-brand-700 shadow-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-success-500 animate-pulse" />
+          Perfil del Inversionista
+        </span>
+        <h1 className="mt-4 text-3xl font-extrabold text-brand-900 tracking-tight">
+          Hola{nombre.trim() ? `, ${nombre.trim().split(" ")[0]}` : ""} 👋
+        </h1>
+        <p className="text-sm text-slate-500 mt-2 max-w-md mx-auto leading-relaxed">
+          {idsPreguntas.length} preguntas evaluadas con reglas versionadas ({preguntas.version}).
+          Cada respuesta influye de forma transparente en tu perfil.
         </p>
+      </header>
+
+      {/* ## Tarjeta elegante estilo Apple Wallet con el nombre del usuario */}
+      <div className="relative overflow-hidden rounded-[1.75rem] p-6 text-white shadow-deep bg-gradient-to-br from-brand-600 via-brand-500 to-accent">
+        <div className="pointer-events-none absolute -top-10 -right-8 h-40 w-40 rounded-full bg-white/15 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-12 -left-6 h-36 w-36 rounded-full bg-brand-950/30 blur-2xl" />
+        <div className="relative flex items-center gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center text-xl font-bold">
+            {(nombre.trim()[0] || "•").toUpperCase()}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-widest text-white/70">Inversionista</p>
+            <p className="text-lg font-bold truncate">{nombre.trim() || "Tu nombre"}</p>
+            <p className="text-xs text-white/70 truncate">{email.trim() || "tu@correo.com"}</p>
+          </div>
+          <div className="ml-auto text-right shrink-0">
+            <p className="text-[11px] uppercase tracking-widest text-white/70">ODS Ratio</p>
+            <p className="text-sm font-semibold">Robo-Advisory</p>
+          </div>
+        </div>
+        <div className="relative mt-6 grid sm:grid-cols-2 gap-3">
+          <label className="text-xs font-semibold text-white/80">
+            Nombre
+            <input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="¿Cómo te llamas?"
+              className="mt-1 w-full rounded-xl bg-white/15 backdrop-blur-md border border-white/30 px-3 py-2 text-white placeholder-white/50 font-normal outline-none focus:border-white/70 transition-colors"
+            />
+          </label>
+          <label className="text-xs font-semibold text-white/80">
+            Correo
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="tu@correo.com"
+              className="mt-1 w-full rounded-xl bg-white/15 backdrop-blur-md border border-white/30 px-3 py-2 text-white placeholder-white/50 font-normal outline-none focus:border-white/70 transition-colors"
+            />
+          </label>
+        </div>
       </div>
 
-      <div className="card-premium p-5 grid sm:grid-cols-2 gap-4">
-        <label className="text-sm font-semibold text-brand-800">
-          Nombre
-          <input
-            value={nombre}
-            onChange={(e) => setNombre(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-brand-100 px-3 py-2 font-normal"
+      {/* ## Indicador + barra de progreso animada (sticky) */}
+      <div className="sticky top-3 z-30 card-premium px-5 py-3.5">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-semibold text-brand-900">Progreso del cuestionario</span>
+          <span className="font-bold text-brand-600">{completas}/{idsPreguntas.length}</span>
+        </div>
+        <div className="mt-2 h-2.5 w-full rounded-pill bg-brand-100 overflow-hidden">
+          <div
+            className="h-full rounded-pill bg-gradient-to-r from-brand-600 to-accent transition-[width] duration-500 ease-out"
+            style={{ width: `${progreso}%` }}
           />
-        </label>
-        <label className="text-sm font-semibold text-brand-800">
-          Correo
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 w-full rounded-xl border border-brand-100 px-3 py-2 font-normal"
-          />
-        </label>
+        </div>
       </div>
 
-      {idsPreguntas.map((pid) => {
+      {/* ## Preguntas en tarjetas modernas */}
+      {idsPreguntas.map((pid, i) => {
         const pregunta = preguntas.preguntas[pid];
+        const contestada = !!respuestas[pid];
         return (
-          <div key={pid} className="card-premium p-5">
-            <div className="flex items-start justify-between gap-3">
-              <p className="font-semibold text-brand-900">{pregunta.texto}</p>
+          <div key={pid} className="card-premium p-6">
+            <div className="flex items-start gap-3">
+              <span
+                className={`shrink-0 h-8 w-8 rounded-xl flex items-center justify-center text-sm font-bold transition-colors ${
+                  contestada ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-500"
+                }`}
+              >
+                {contestada ? "✓" : i + 1}
+              </span>
+              <p className="font-semibold text-brand-900 leading-snug pt-1">{pregunta.texto}</p>
               {esPiloto && (
                 <button
                   type="button"
                   onClick={() => setFeedbackAbierto(feedbackAbierto === pid ? null : pid)}
-                  className="text-slate-300 hover:text-brand-500 text-sm shrink-0"
+                  className="ml-auto text-slate-300 hover:text-brand-500 text-sm shrink-0 pt-1"
                   title="¿Esta pregunta te pareció confusa?"
                 >
                   💬
@@ -139,44 +220,66 @@ export default function OnboardingPage() {
                 placeholder="¿Algo confuso en esta pregunta? (opcional)"
                 value={feedbackPorPregunta[pid] ?? ""}
                 onChange={(e) => setFeedbackPorPregunta((prev) => ({ ...prev, [pid]: e.target.value }))}
-                className="mt-2 w-full text-sm rounded-lg border border-brand-100 px-3 py-1.5"
+                className="mt-3 w-full text-sm rounded-xl border border-brand-100 px-3 py-2"
               />
             )}
-            <div className="grid sm:grid-cols-2 gap-2.5 mt-3">
-              {Object.entries(pregunta.opciones).map(([oid, opcion]) => (
-                <button
-                  key={oid}
-                  type="button"
-                  onClick={() => responder(pid, oid)}
-                  className={`text-left text-sm px-3.5 py-2.5 rounded-xl border transition-colors ${
-                    respuestas[pid] === oid
-                      ? "border-brand-600 bg-brand-50 text-brand-900 font-semibold"
-                      : "border-slate-200 hover:border-brand-300 text-slate-600"
-                  }`}
-                >
-                  {opcion.texto}
-                </button>
-              ))}
+            <div className="grid sm:grid-cols-2 gap-3 mt-4">
+              {Object.entries(pregunta.opciones).map(([oid, opcion]) => {
+                const sel = respuestas[pid] === oid;
+                return (
+                  <button
+                    key={oid}
+                    type="button"
+                    onClick={() => responder(pid, oid)}
+                    className={`text-left text-sm px-4 py-3.5 rounded-2xl border transition-all duration-200 ease-ios ${
+                      sel
+                        ? "border-brand-600 bg-gradient-to-br from-brand-50 to-white text-brand-900 font-semibold shadow-lift"
+                        : "border-slate-200 bg-white/50 hover:border-brand-300 hover:-translate-y-0.5 text-slate-600"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <span
+                        className={`shrink-0 h-4 w-4 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          sel ? "border-brand-600 bg-brand-600" : "border-slate-300"
+                        }`}
+                      >
+                        {sel && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </span>
+                      {opcion.texto}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         );
       })}
 
-      <div className="card-premium p-5">
+      {/* ## Retroalimentación opcional */}
+      <div className="card-premium p-6">
         <p className="font-semibold text-brand-900">{preguntas.pregunta_opcional.texto}</p>
         <textarea
           value={retroGeneral}
           onChange={(e) => setRetroGeneral(e.target.value)}
           placeholder={preguntas.pregunta_opcional.placeholder}
-          className="mt-2 w-full rounded-xl border border-brand-100 px-3 py-2 text-sm"
+          className="mt-3 w-full rounded-xl border border-brand-100 px-3 py-2.5 text-sm"
           rows={3}
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-600 text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          {error}
+        </p>
+      )}
 
-      <button onClick={enviar} disabled={enviando} className="btn-primary w-full disabled:opacity-50">
-        {enviando ? "Generando propuesta…" : `Generar mi propuesta (${completas}/${idsPreguntas.length})`}
+      {/* ## Botón grande */}
+      <button
+        onClick={enviar}
+        disabled={enviando}
+        className="btn-primary w-full text-base py-4 rounded-2xl disabled:opacity-50"
+      >
+        {enviando ? "Generando propuesta…" : `Generar mi propuesta · ${completas}/${idsPreguntas.length}`}
       </button>
     </div>
   );
