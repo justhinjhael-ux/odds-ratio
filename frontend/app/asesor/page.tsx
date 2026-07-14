@@ -10,6 +10,10 @@
 // ## ==========================================================================
 import { useEffect, useMemo, useState } from "react";
 import AnalisisEstadistico from "@/components/AnalisisEstadistico";
+import EmptyState from "@/components/EmptyState";
+import InfoTip from "@/components/InfoTip";
+import { SkeletonGrid, SkeletonRow } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 import {
   AutopilotConfig,
   ClientRankingRow,
@@ -51,12 +55,14 @@ function buscarInfluencia(influencias: HistoryItem["perfil"]["influencias"], pal
 }
 
 export default function AsesorPage() {
+  const { mostrar } = useToast();
   const [token, setToken] = useState<string | null>(null);
   const [usuario, setUsuario] = useState("");
   const [clave, setClave] = useState("");
   const [errorLogin, setErrorLogin] = useState("");
   const [vista, setVista] = useState<Vista>("dashboard");
   const [notifAbierta, setNotifAbierta] = useState(false);
+  const [cargando, setCargando] = useState(true);
 
   const [historia, setHistoria] = useState<HistoryItem[]>([]);
   const [calidad, setCalidad] = useState<QualityReport | null>(null);
@@ -71,6 +77,9 @@ export default function AsesorPage() {
   const [seleccionado, setSeleccionado] = useState<HistoryItem | null>(null);
   const [modoEdicion, setModoEdicion] = useState(false);
   const [distEditada, setDistEditada] = useState<Record<string, number>>({});
+  // ## Confirmación visual antes de una decisión irreversible (aprobar/rechazar)
+  const [confirmando, setConfirmando] = useState<"approve" | "reject" | null>(null);
+  const [decidiendo, setDecidiendo] = useState(false);
 
   // ## Análisis estadístico completo del caso seleccionado (Markowitz + correlación)
   const [markowitzCaso, setMarkowitzCaso] = useState<MarkowitzResult | null>(null);
@@ -110,10 +119,11 @@ export default function AsesorPage() {
     setRanking(r);
     setAuditoria(au);
     setSeleccionado((prev) => (prev ? h.find((x) => x.client_id === prev.client_id) ?? null : null));
+    setCargando(false);
   }
 
   useEffect(() => {
-    if (token) recargar(token).catch(() => {});
+    if (token) recargar(token).catch(() => setCargando(false));
   }, [token]);
 
   async function handleLogin() {
@@ -122,20 +132,35 @@ export default function AsesorPage() {
       const r = await login(usuario, clave);
       setToken(r.token);
     } catch {
-      setErrorLogin("Usuario o clave incorrectos.");
+      setErrorLogin("Usuario o clave incorrectos. Verifica mayúsculas y vuelve a intentarlo.");
     }
   }
 
-  async function decidir(proposalId: number, decision: "approve" | "edit" | "reject", distribucionEditada?: Record<string, number>) {
+  const MENSAJE_DECISION: Record<string, string> = {
+    approve: "Propuesta aprobada",
+    edit: "Edición guardada",
+    reject: "Propuesta rechazada",
+  };
+
+  async function decidir(proposalId: number, decision: "approve" | "edit" | "reject", distribucionEditada?: Record<string, number>, nombreCliente?: string) {
     if (!token) return;
-    await sendDecision(token, proposalId, {
-      decision,
-      asesor: usuario || "operador",
-      comentario: "",
-      distribucion_editada: distribucionEditada,
-    });
-    setModoEdicion(false);
-    recargar(token);
+    setDecidiendo(true);
+    try {
+      await sendDecision(token, proposalId, {
+        decision,
+        asesor: usuario || "operador",
+        comentario: "",
+        distribucion_editada: distribucionEditada,
+      });
+      setModoEdicion(false);
+      setConfirmando(null);
+      await recargar(token);
+      mostrar(MENSAJE_DECISION[decision] ?? "Decisión registrada", "success", nombreCliente ? `Cliente: ${nombreCliente}. Queda en el historial de auditoría.` : undefined);
+    } catch {
+      mostrar("No se pudo registrar la decisión", "error", "Verifica tu conexión con el servidor e inténtalo de nuevo.");
+    } finally {
+      setDecidiendo(false);
+    }
   }
 
   const pendientes = historia.filter((h) => h.revision.estado === "pendiente");
@@ -153,6 +178,17 @@ export default function AsesorPage() {
     if (filtroEstado !== "todos" && h.revision.estado !== filtroEstado) return false;
     return true;
   });
+
+  // ## Resumen ejecutivo del Dashboard — derivado 100% de `historia`, ya cargada.
+  const resumen = useMemo(() => {
+    const confianzas = historia.filter((h) => h.propuesta).map((h) => h.propuesta!.confianza);
+    return {
+      pendientes: historia.filter((h) => h.revision.estado === "pendiente").length,
+      aprobadas: historia.filter((h) => h.revision.estado === "aprobada").length,
+      confianzaMedia: confianzas.length ? Math.round((confianzas.reduce((a, b) => a + b, 0) / confianzas.length) * 100) : null,
+      recomendadas: historia.filter((h) => h.propuesta?.autopilot?.recomendado && h.revision.estado === "pendiente").length,
+    };
+  }, [historia]);
 
   const auditoriaFiltrada = auditoria.filter((a) => {
     const nombre = (clienteMap.get(a.proposal_id) || "").toLowerCase();
@@ -184,8 +220,15 @@ export default function AsesorPage() {
           onKeyDown={(e) => e.key === "Enter" && handleLogin()}
           className="w-full rounded-xl border border-brand-100 bg-white/70 px-3 py-2.5 text-sm mb-3"
         />
-        {errorLogin && <p className="text-xs text-red-600 mb-2">{errorLogin}</p>}
+        {errorLogin && (
+          <p className="text-xs text-red-600 mb-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">
+            ⚠️ {errorLogin}
+          </p>
+        )}
         <button onClick={handleLogin} className="btn-primary w-full">Entrar</button>
+        <p className="text-[11px] text-slate-400 text-center mt-4 flex items-center justify-center gap-1.5">
+          <span className="text-success-500">🔒</span> Acceso exclusivo para funcionarios autorizados
+        </p>
       </div>
     );
   }
@@ -227,7 +270,10 @@ export default function AsesorPage() {
             onClick={() => {
               setVista(n.id);
               setSeleccionado(null);
+              setConfirmando(null);
+              setModoEdicion(false);
             }}
+            aria-current={vista === n.id ? "page" : undefined}
             className={`flex items-center gap-2.5 text-sm font-semibold px-3 py-2.5 rounded-xl text-left transition-all ${
               vista === n.id
                 ? "bg-gradient-to-b from-brand-500 to-brand-700 text-white shadow-lift"
@@ -277,6 +323,7 @@ export default function AsesorPage() {
             <div className="relative">
               <button
                 onClick={() => setNotifAbierta((v) => !v)}
+                aria-label={`Notificaciones${pendientes.length > 0 ? `, ${pendientes.length} pendientes` : ""}`}
                 className="relative h-9 w-9 rounded-xl bg-white/70 border border-brand-100 flex items-center justify-center hover:-translate-y-0.5 transition-transform"
               >
                 🔔
@@ -295,6 +342,8 @@ export default function AsesorPage() {
                       key={h.client_id}
                       onClick={() => {
                         setVista("dashboard");
+                        setConfirmando(null);
+                        setModoEdicion(false);
                         setSeleccionado(h);
                         setNotifAbierta(false);
                       }}
@@ -310,8 +359,65 @@ export default function AsesorPage() {
         </div>
 
         {/* ## ================= DASHBOARD ================= */}
-        {vista === "dashboard" && !seleccionado && (
+        {vista === "dashboard" && !seleccionado && cargando && <SkeletonGrid n={6} />}
+
+        {vista === "dashboard" && !seleccionado && !cargando && (
           <div className="space-y-4">
+            {/* ## Resumen ejecutivo: centro de inteligencia financiera de un vistazo.
+            ## Todo derivado de `historia`/`auditoria` ya cargados — cero llamadas nuevas. */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="card-premium p-4">
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Pendientes</p>
+                <p className="text-2xl font-extrabold text-amber-500 mt-1">{resumen.pendientes}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">esperan decisión humana</p>
+              </div>
+              <div className="card-premium p-4">
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">Aprobadas</p>
+                <p className="text-2xl font-extrabold text-success-500 mt-1">{resumen.aprobadas}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">de {historia.length} clientes totales</p>
+              </div>
+              <div className="card-premium p-4">
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold flex items-center gap-1">
+                  Confianza media
+                  <InfoTip texto="Promedio de la confianza bayesiana (Beta-Binomial) de todas las propuestas con confianza calculada. Más alto = el modelo está más seguro de esa clasificación de riesgo." />
+                </p>
+                <p className="text-2xl font-extrabold text-brand-700 mt-1">{resumen.confianzaMedia ?? "—"}%</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">across all proposals</p>
+              </div>
+              <div className="card-premium p-4">
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold flex items-center gap-1">
+                  🤖 Recomendadas
+                  <InfoTip texto="Propuestas donde el Autopiloto detectó confianza alta y sin alertas de Cumplimiento. Solo es una sugerencia — nunca aprueba nada por sí solo." />
+                </p>
+                <p className="text-2xl font-extrabold text-brand-700 mt-1">{resumen.recomendadas}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">candidatas a revisión rápida</p>
+              </div>
+            </div>
+
+            {/* ## Actividad reciente — últimas decisiones registradas (auditoría ya cargada) */}
+            {auditoria.length > 0 && (
+              <div className="card-premium p-4">
+                <p className="text-xs font-extrabold text-brand-700 uppercase tracking-wide mb-3">Actividad reciente</p>
+                <ul className="space-y-2">
+                  {[...auditoria]
+                    .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+                    .slice(0, 4)
+                    .map((a) => (
+                      <li key={a.id} className="flex items-center gap-2.5 text-xs">
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${a.decision === "reject" ? "bg-red-400" : a.decision === "edit" ? "bg-accent" : "bg-success-500"}`} />
+                        <span className="text-slate-500 truncate">
+                          <b className="text-brand-800">{a.asesor}</b> {a.decision === "approve" ? "aprobó" : a.decision === "edit" ? "editó" : "rechazó"} la propuesta de{" "}
+                          <b className="text-brand-800">{clienteMap.get(a.proposal_id) || `#${a.proposal_id}`}</b>
+                        </span>
+                        <span className="ml-auto text-slate-300 shrink-0">
+                          {a.created_at ? new Date(a.created_at).toLocaleDateString("es-EC") : ""}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
               {["todos", "pendiente", "aprobada", "rechazada", "editada"].map((f) => (
                 <button
@@ -326,6 +432,19 @@ export default function AsesorPage() {
               ))}
             </div>
 
+            {clientesFiltrados.length === 0 && (
+              <EmptyState
+                icono="🔍"
+                titulo="No hay clientes que coincidan"
+                texto={busqueda ? `Nadie coincide con "${busqueda}". Prueba con otro nombre o cambia el filtro de estado.` : "No hay clientes en este estado todavía. Prueba con otro filtro."}
+                accion={
+                  busqueda || filtroEstado !== "todos"
+                    ? { label: "Limpiar filtros", onClick: () => { setBusqueda(""); setFiltroEstado("todos"); } }
+                    : undefined
+                }
+              />
+            )}
+
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {clientesFiltrados.map((h) => {
                 const nombre = h.cliente_nombre?.trim() || `Cliente Demo ${h.client_id}`;
@@ -333,7 +452,11 @@ export default function AsesorPage() {
                 return (
                   <button
                     key={h.propuesta?.proposal_id ?? h.client_id}
-                    onClick={() => setSeleccionado(h)}
+                    onClick={() => {
+                      setConfirmando(null);
+                      setModoEdicion(false);
+                      setSeleccionado(h);
+                    }}
                     className="card-premium p-5 text-left hover:-translate-y-1 transition-transform"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -372,7 +495,14 @@ export default function AsesorPage() {
 
           return (
             <div className="space-y-5 animate-rise">
-              <button onClick={() => setSeleccionado(null)} className="text-xs font-bold text-brand-600 hover:text-brand-800">
+              <button
+                onClick={() => {
+                  setSeleccionado(null);
+                  setConfirmando(null);
+                  setModoEdicion(false);
+                }}
+                className="text-xs font-bold text-brand-600 hover:text-brand-800"
+              >
                 ← Volver al dashboard
               </button>
 
@@ -383,8 +513,14 @@ export default function AsesorPage() {
                   <div>
                     <p className="text-[11px] uppercase tracking-widest text-white/70">Resumen del cliente</p>
                     <h2 className="text-2xl font-extrabold">{nombre}</h2>
-                    <p className="text-sm text-white/80 capitalize mt-1">
+                    <p className="text-sm text-white/80 capitalize mt-1 flex items-center gap-1.5">
                       Perfil {h.perfil.perfil} · Score {h.perfil.score} · Confianza {confianzaPct ?? "—"}%
+                      <span className="[&_button]:bg-white/25 [&_button]:text-white [&_button:hover]:bg-white/40">
+                        <InfoTip
+                          label="¿Cómo se calculó la confianza?"
+                          texto="Modelo bayesiano Beta-Binomial: parte de un prior neutral y se ajusta con cada decisión histórica de los asesores. Un % más alto significa que el sistema está más seguro de que este perfil de riesgo es correcto."
+                        />
+                      </span>
                     </p>
                   </div>
                   <span className={`text-xs font-bold uppercase px-3 py-1.5 rounded-pill bg-white/20 backdrop-blur-md border border-white/30`}>
@@ -429,13 +565,41 @@ export default function AsesorPage() {
                 </div>
               )}
 
-              {/* ## Botones grandes de decisión */}
+              {/* ## Botones grandes de decisión — con confirmación visual antes de
+              ## aprobar/rechazar (acciones que quedan en auditoría permanente). */}
               {h.revision.estado === "pendiente" && h.propuesta && (
                 <div className="card-premium p-5">
-                  {!modoEdicion ? (
+                  {!modoEdicion && confirmando ? (
+                    <div className="text-center space-y-3 animate-rise">
+                      <p className="text-sm font-semibold text-brand-900">
+                        {confirmando === "approve"
+                          ? `¿Confirmas aprobar la propuesta de ${nombre}?`
+                          : `¿Confirmas rechazar la propuesta de ${nombre}?`}
+                      </p>
+                      <p className="text-xs text-slate-400">Esta decisión queda registrada en el historial de auditoría, con tu usuario y la fecha.</p>
+                      <div className="flex justify-center gap-3">
+                        <button
+                          disabled={decidiendo}
+                          onClick={() => decidir(h.propuesta!.proposal_id, confirmando, undefined, nombre)}
+                          className={`text-sm font-extrabold px-6 py-3 rounded-2xl text-white shadow-lift hover:-translate-y-0.5 transition-transform disabled:opacity-60 bg-gradient-to-b ${
+                            confirmando === "approve" ? "from-success-400 to-success-500" : "from-red-400 to-red-500"
+                          }`}
+                        >
+                          {decidiendo ? "Registrando…" : confirmando === "approve" ? "Sí, aprobar" : "Sí, rechazar"}
+                        </button>
+                        <button
+                          disabled={decidiendo}
+                          onClick={() => setConfirmando(null)}
+                          className="text-sm font-bold px-6 py-3 rounded-2xl bg-slate-100 text-slate-500 disabled:opacity-60"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : !modoEdicion ? (
                     <div className="flex flex-wrap gap-3">
                       <button
-                        onClick={() => decidir(h.propuesta!.proposal_id, "approve")}
+                        onClick={() => setConfirmando("approve")}
                         className="flex-1 min-w-[140px] text-sm font-extrabold px-5 py-4 rounded-2xl bg-gradient-to-b from-success-400 to-success-500 text-white shadow-lift hover:-translate-y-0.5 transition-transform"
                       >
                         ✓ Aprobar
@@ -450,7 +614,7 @@ export default function AsesorPage() {
                         ✎ Editar
                       </button>
                       <button
-                        onClick={() => decidir(h.propuesta!.proposal_id, "reject")}
+                        onClick={() => setConfirmando("reject")}
                         className="flex-1 min-w-[140px] text-sm font-extrabold px-5 py-4 rounded-2xl bg-gradient-to-b from-red-400 to-red-500 text-white shadow-lift hover:-translate-y-0.5 transition-transform"
                       >
                         ✕ Rechazar
@@ -472,17 +636,24 @@ export default function AsesorPage() {
                           </label>
                         ))}
                       </div>
-                      <p className="text-xs text-slate-400">
-                        Suma actual: {Object.values(distEditada).reduce((a, b) => a + b, 0).toFixed(1)}%
-                      </p>
+                      {(() => {
+                        const suma = Object.values(distEditada).reduce((a, b) => a + b, 0);
+                        const cuadra = Math.abs(suma - 100) < 0.1;
+                        return (
+                          <p className={`text-xs font-semibold ${cuadra ? "text-success-500" : "text-amber-600"}`}>
+                            Suma actual: {suma.toFixed(1)}% {cuadra ? "✓ cuadra con 100%" : "— revisa antes de guardar, debería sumar 100%"}
+                          </p>
+                        );
+                      })()}
                       <div className="flex gap-2">
                         <button
-                          onClick={() => decidir(h.propuesta!.proposal_id, "edit", distEditada)}
-                          className="text-sm font-bold px-5 py-2.5 rounded-xl bg-brand-600 text-white"
+                          disabled={decidiendo}
+                          onClick={() => decidir(h.propuesta!.proposal_id, "edit", distEditada, nombre)}
+                          className="text-sm font-bold px-5 py-2.5 rounded-xl bg-brand-600 text-white disabled:opacity-60"
                         >
-                          Guardar edición
+                          {decidiendo ? "Guardando…" : "Guardar edición"}
                         </button>
-                        <button onClick={() => setModoEdicion(false)} className="text-sm font-bold px-5 py-2.5 rounded-xl bg-slate-100 text-slate-500">
+                        <button onClick={() => setModoEdicion(false)} disabled={decidiendo} className="text-sm font-bold px-5 py-2.5 rounded-xl bg-slate-100 text-slate-500 disabled:opacity-60">
                           Cancelar
                         </button>
                       </div>
@@ -563,35 +734,46 @@ export default function AsesorPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {auditoriaFiltrada.map((a) => (
-                    <tr key={a.id} className="border-t border-white/60 hover:bg-brand-50/60 hover:-translate-y-0 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-brand-900 whitespace-nowrap">
-                        {clienteMap.get(a.proposal_id) || `Propuesta #${a.proposal_id}`}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                        {a.created_at ? new Date(a.created_at).toLocaleDateString("es-EC") : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                        {a.rules_version} / {a.posterior_version}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-pill ${ESTADO_ESTILO[DECISION_A_ESTADO[a.decision] ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
-                          {a.decision}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{a.asesor}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500 max-w-[240px] truncate">{a.comentario || "—"}</td>
-                    </tr>
-                  ))}
-                  {auditoriaFiltrada.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-4 py-6 text-center text-slate-400 text-sm">
-                        Sin registros de auditoría todavía.
-                      </td>
-                    </tr>
-                  )}
+                  {cargando && Array.from({ length: 4 }).map((_, i) => <SkeletonRow key={i} />)}
+                  {!cargando &&
+                    auditoriaFiltrada.map((a) => (
+                      <tr key={a.id} className="border-t border-white/60 hover:bg-brand-50/60 hover:-translate-y-0 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-brand-900 whitespace-nowrap">
+                          {clienteMap.get(a.proposal_id) || `Propuesta #${a.proposal_id}`}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                          {a.created_at ? new Date(a.created_at).toLocaleDateString("es-EC") : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                          {a.rules_version} / {a.posterior_version}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-pill ${ESTADO_ESTILO[DECISION_A_ESTADO[a.decision] ?? ""] ?? "bg-slate-100 text-slate-500"}`}>
+                            {a.decision}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{a.asesor}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500 max-w-[240px] truncate">{a.comentario || "—"}</td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
+              {!cargando && auditoriaFiltrada.length === 0 && (
+                <EmptyState
+                  icono="🕒"
+                  titulo="Sin registros de auditoría todavía"
+                  texto={
+                    buscHistorial || filtroHistorial !== "todos"
+                      ? "Nada coincide con tu búsqueda o filtro actual."
+                      : "Cuando un asesor apruebe, edite o rechace una propuesta, aparecerá aquí de forma permanente."
+                  }
+                  accion={
+                    buscHistorial || filtroHistorial !== "todos"
+                      ? { label: "Limpiar filtros", onClick: () => { setBuscHistorial(""); setFiltroHistorial("todos"); } }
+                      : undefined
+                  }
+                />
+              )}
             </div>
           </div>
         )}

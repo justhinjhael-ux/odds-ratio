@@ -10,6 +10,8 @@
 // ## ==========================================================================
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SkeletonLine } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
 import {
   Questionnaire,
   RespuestaMeta,
@@ -20,6 +22,7 @@ import {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { mostrar } = useToast();
   const [preguntas, setPreguntas] = useState<Questionnaire | null>(null);
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
@@ -29,6 +32,7 @@ export default function OnboardingPage() {
   const [feedbackPorPregunta, setFeedbackPorPregunta] = useState<Record<string, string>>({});
   const [retroGeneral, setRetroGeneral] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [exito, setExito] = useState(false);
   const [error, setError] = useState("");
 
   // ## tracking silencioso: timestamp de entrada + conteo de cambios por pregunta
@@ -66,6 +70,7 @@ export default function OnboardingPage() {
     if (!preguntas) return;
     if (completas < idsPreguntas.length) {
       setError("Responde todas las preguntas antes de continuar.");
+      mostrar("Faltan respuestas", "error", `Te quedan ${idsPreguntas.length - completas} preguntas por responder.`);
       return;
     }
     setEnviando(true);
@@ -78,23 +83,29 @@ export default function OnboardingPage() {
         test_metadata: { is_pilot_sample: esPiloto, device: navigator.userAgent.slice(0, 60) },
         retroalimentacion_general: retroGeneral,
       });
-      router.push(`/propuesta?id=${resultado.proposal_id}`);
+      // ## Momento wow: breve celebración antes de pasar a la propuesta
+      setExito(true);
+      setTimeout(() => router.push(`/propuesta?id=${resultado.proposal_id}`), 900);
     } catch (e) {
-      setError("No se pudo crear la propuesta. Verifica el backend e inténtalo de nuevo.");
-    } finally {
+      setError("No se pudo crear la propuesta. Verifica tu conexión e inténtalo de nuevo.");
+      mostrar("No se pudo generar tu propuesta", "error", "Revisa tu conexión a internet e inténtalo de nuevo en unos segundos.");
       setEnviando(false);
     }
   }
 
   if (!preguntas) {
     return (
-      <div className="max-w-2xl mx-auto flex flex-col items-center justify-center py-28 text-center animate-rise">
-        <div className="relative h-14 w-14">
-          <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
-          <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
+      <div className="max-w-2xl mx-auto space-y-6 pb-12">
+        <div className="flex flex-col items-center text-center gap-2 py-4">
+          <SkeletonLine width="220px" height="1.75rem" />
+          <SkeletonLine width="280px" height="0.9rem" />
         </div>
-        <p className="mt-5 font-semibold text-brand-900">Preparando tu perfil…</p>
-        <p className="text-sm text-slate-500 mt-1">Cargando cuestionario seguro</p>
+        <div className="skeleton-block" style={{ width: "100%", height: "150px", borderRadius: "1.75rem" }} />
+        <div className="skeleton-block" style={{ width: "100%", height: "70px", borderRadius: "1.75rem" }} />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div className="skeleton-block" key={i} style={{ width: "100%", height: "140px", borderRadius: "1.75rem" }} />
+        ))}
+        <p className="text-center text-xs text-slate-400">Cargando cuestionario seguro…</p>
       </div>
     );
   }
@@ -105,16 +116,29 @@ export default function OnboardingPage() {
     <div className="max-w-2xl mx-auto space-y-6 pb-12 animate-rise">
       {/* ## Overlay de transición elegante mientras se genera la propuesta */}
       {enviando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-md">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-950/40 backdrop-blur-md" role="status" aria-live="polite">
           <div className="card-premium px-10 py-9 flex flex-col items-center gap-4 text-center animate-rise">
-            <div className="relative h-16 w-16">
-              <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
-              <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
-            </div>
-            <p className="font-bold text-brand-900 text-lg">Generando tu propuesta…</p>
-            <p className="text-xs text-slate-500 max-w-[15rem] leading-relaxed">
-              Analizando tu perfil con reglas versionadas y modelos bayesianos
-            </p>
+            {!exito ? (
+              <>
+                <div className="relative h-16 w-16">
+                  <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
+                  <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
+                </div>
+                <p className="font-bold text-brand-900 text-lg">Generando tu propuesta…</p>
+                <p className="text-xs text-slate-500 max-w-[15rem] leading-relaxed">
+                  Analizando tu perfil con reglas versionadas y modelos bayesianos
+                </p>
+              </>
+            ) : (
+              <>
+                {/* ## Momento wow: celebración discreta al terminar */}
+                <div className="h-16 w-16 rounded-full bg-gradient-to-br from-success-400 to-success-500 flex items-center justify-center text-white text-3xl animate-pop">
+                  ✓
+                </div>
+                <p className="font-bold text-brand-900 text-lg">¡Perfil listo!</p>
+                <p className="text-xs text-slate-500 max-w-[15rem] leading-relaxed">Llevándote a tu propuesta personalizada…</p>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -175,11 +199,11 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* ## Indicador + barra de progreso animada (sticky) */}
-      <div className="sticky top-3 z-30 card-premium px-5 py-3.5">
+      {/* ## Indicador + barra de progreso animada (sticky) — responde "¿dónde estoy?" */}
+      <div className="sticky top-3 z-30 card-premium px-5 py-3.5" role="status" aria-live="polite">
         <div className="flex items-center justify-between text-sm">
           <span className="font-semibold text-brand-900">Progreso del cuestionario</span>
-          <span className="font-bold text-brand-600">{completas}/{idsPreguntas.length}</span>
+          <span className="font-bold text-brand-600">{completas}/{idsPreguntas.length} · {progreso}%</span>
         </div>
         <div className="mt-2 h-2.5 w-full rounded-pill bg-brand-100 overflow-hidden">
           <div
@@ -187,6 +211,11 @@ export default function OnboardingPage() {
             style={{ width: `${progreso}%` }}
           />
         </div>
+        {progreso === 100 && (
+          <p className="text-xs text-success-500 font-semibold mt-2 animate-rise">
+            ✓ Todo listo — revisa tus respuestas y genera tu propuesta cuando quieras.
+          </p>
+        )}
       </div>
 
       {/* ## Preguntas en tarjetas modernas */}
@@ -231,6 +260,7 @@ export default function OnboardingPage() {
                     key={oid}
                     type="button"
                     onClick={() => responder(pid, oid)}
+                    aria-pressed={sel}
                     className={`text-left text-sm px-4 py-3.5 rounded-2xl border transition-all duration-200 ease-ios ${
                       sel
                         ? "border-brand-600 bg-gradient-to-br from-brand-50 to-white text-brand-900 font-semibold shadow-lift"
@@ -251,6 +281,12 @@ export default function OnboardingPage() {
                 );
               })}
             </div>
+            {/* ## IA explicable: por qué esta respuesta influye en tu perfil — feedback inmediato */}
+            {contestada && (
+              <p className="text-xs text-brand-600 bg-brand-50/70 border border-brand-100 rounded-xl px-3.5 py-2.5 mt-3 leading-relaxed animate-rise">
+                💡 {pregunta.opciones[respuestas[pid]]?.explicacion}
+              </p>
+            )}
           </div>
         );
       })}
@@ -268,9 +304,13 @@ export default function OnboardingPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 text-center bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          {error}
-        </p>
+        <div className="flex items-start gap-2.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 animate-rise" role="alert">
+          <span className="shrink-0">⚠️</span>
+          <div>
+            <p className="font-semibold">{error}</p>
+            <p className="text-xs text-red-500 mt-0.5">Nada se pierde: tus respuestas siguen aquí, solo corrige e inténtalo de nuevo.</p>
+          </div>
+        </div>
       )}
 
       {/* ## Botón grande */}

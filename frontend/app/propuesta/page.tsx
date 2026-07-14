@@ -6,8 +6,12 @@
 // ## componente COMPARTIDO también con el Panel Operativo del asesor.
 // ## ==========================================================================
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AnalisisEstadistico from "@/components/AnalisisEstadistico";
+import EmptyState from "@/components/EmptyState";
+import InfoTip from "@/components/InfoTip";
+import { SkeletonLine } from "@/components/Skeleton";
 import {
   CorrelationMatrix,
   MarkowitzResult,
@@ -30,13 +34,26 @@ function nivelRiesgo(perfil: string) {
 
 function LoadingState() {
   return (
-    <div className="max-w-3xl mx-auto flex flex-col items-center justify-center py-28 text-center animate-rise">
-      <div className="relative h-14 w-14">
-        <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
-        <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
+    <div className="max-w-3xl mx-auto space-y-6 pb-12">
+      <div className="flex flex-col items-center text-center gap-3 py-2">
+        <div className="relative h-12 w-12">
+          <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
+          <div className="absolute inset-0 rounded-full border-4 border-t-brand-600 border-transparent animate-spin" />
+        </div>
+        <p className="font-semibold text-brand-900">Construyendo tu propuesta…</p>
+        <p className="text-sm text-slate-500 -mt-2">
+          Perfilando riesgo con Bayes, proyectando escenarios y comparando contra Markowitz
+        </p>
       </div>
-      <p className="mt-5 font-semibold text-brand-900">Construyendo tu propuesta…</p>
-      <p className="text-sm text-slate-500 mt-1">Perfilando riesgo y proyecciones</p>
+      <div className="skeleton-block" style={{ width: "100%", height: "150px", borderRadius: "1.75rem" }} />
+      <div className="grid grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="skeleton-block" style={{ height: "72px", borderRadius: "1.75rem" }} />
+        ))}
+      </div>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="skeleton-block" style={{ width: "100%", height: "220px", borderRadius: "1.75rem" }} />
+      ))}
     </div>
   );
 }
@@ -73,9 +90,14 @@ function PropuestaContenido() {
 
   if (error)
     return (
-      <p className="text-center text-red-600 py-20 max-w-md mx-auto bg-red-50 border border-red-200 rounded-xl">
-        {error}
-      </p>
+      <div className="max-w-md mx-auto pt-10">
+        <EmptyState
+          icono="⚠️"
+          titulo="No se pudo cargar la propuesta"
+          texto="Puede ser una conexión inestable con el servidor o un enlace vencido. Intenta de nuevo o vuelve a crear tu perfil."
+          accion={{ label: "Crear un nuevo perfil", onClick: () => (window.location.href = "/onboarding") }}
+        />
+      </div>
     );
   if (!propuesta) return <LoadingState />;
 
@@ -121,7 +143,15 @@ function PropuestaContenido() {
             </div>
           </div>
           <div className="min-w-0">
-            <p className="text-[11px] uppercase tracking-widest text-white/70">Tu perfil</p>
+            <p className="text-[11px] uppercase tracking-widest text-white/70 flex items-center gap-1.5">
+              Tu perfil
+              <span className="[&_button]:bg-white/25 [&_button]:text-white [&_button:hover]:bg-white/40">
+                <InfoTip
+                  label="¿Cómo se calculó tu perfil y tu confianza?"
+                  texto={`Fuiste clasificado como "${propuesta.perfil}" según reglas versionadas sobre tus respuestas. La confianza (${confianzaPct}%) es un modelo bayesiano (Beta-Binomial) que mide qué tan seguro está el sistema de esa clasificación — y se afina con cada decisión que toman los asesores humanos.`}
+                />
+              </span>
+            </p>
             <h1 className="text-3xl font-extrabold capitalize leading-tight">{propuesta.perfil}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <span className="inline-block text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-pill bg-white/20 backdrop-blur-md border border-white/30">
@@ -148,6 +178,35 @@ function PropuestaContenido() {
         explicacion={propuesta.explicacion}
         guardrailActivado={propuesta.guardrail_activado}
       />
+
+      {/* ## Confianza: responde "¿qué sigue?" — nunca dejar al usuario sin saber el próximo paso */}
+      <div className="card-premium p-6 bg-gradient-to-br from-brand-50 to-white">
+        <div className="flex items-center gap-2.5 mb-3">
+          <span className="h-8 w-8 rounded-xl bg-gradient-to-br from-brand-600 to-brand-800 flex items-center justify-center text-white text-sm">
+            🧭
+          </span>
+          <h2 className="font-bold text-brand-900">¿Qué sigue?</h2>
+        </div>
+        <ol className="space-y-2.5 text-sm text-slate-600 leading-relaxed">
+          <li className="flex gap-2.5">
+            <span className="shrink-0 h-5 w-5 rounded-full bg-success-400/20 text-success-600 text-[11px] font-bold flex items-center justify-center mt-0.5">✓</span>
+            Tu propuesta ya está generada con los modelos estadísticos vigentes.
+          </li>
+          <li className="flex gap-2.5">
+            <span className="shrink-0 h-5 w-5 rounded-full bg-amber-100 text-amber-600 text-[11px] font-bold flex items-center justify-center mt-0.5 animate-pulse">
+              ●
+            </span>
+            Un asesor humano autorizado la revisará antes de cualquier acción — nada se ejecuta automáticamente.
+          </li>
+          <li className="flex gap-2.5">
+            <span className="shrink-0 h-5 w-5 rounded-full bg-slate-100 text-slate-400 text-[11px] font-bold flex items-center justify-center mt-0.5">3</span>
+            Si tienes dudas mientras esperas, el centro de ayuda (ícono ❔ abajo a la izquierda) tiene respuestas y acceso directo al Chat ORAI.
+          </li>
+        </ol>
+        <p className="text-xs text-slate-400 mt-4">
+          🔒 Tus datos son ficticios en este entorno de demostración y nunca se comparten con terceros.
+        </p>
+      </div>
     </div>
   );
 }

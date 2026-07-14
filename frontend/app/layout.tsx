@@ -4,6 +4,8 @@
 // ## ==========================================================================
 import type { Metadata } from "next";
 import Link from "next/link";
+import HelpWidget from "@/components/HelpWidget";
+import ToastProvider from "@/components/Toast";
 import { asset } from "@/lib/assetPath";
 import "./globals.css";
 
@@ -32,21 +34,33 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/onboarding" className="hover:text-brand-900">Crear perfil</Link>
               <Link href="/chat" className="hover:text-brand-900">Chat ORAI</Link>
               <Link href="/asesor" className="hover:text-brand-900">Panel Operativo</Link>
+              {/* ## Confianza: sus datos están protegidos, visible en cada pantalla */}
+              <span className="hidden md:flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 border-l border-slate-200 pl-4">
+                <span className="text-success-500">🔒</span> Datos cifrados en tránsito
+              </span>
             </nav>
           </div>
         </header>
 
-        <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">{children}</main>
+        <ToastProvider>
+          <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8">{children}</main>
 
-        <footer className="border-t border-white/60 bg-white/50 backdrop-blur-md">
-          <div className="max-w-6xl mx-auto px-6 py-4">
-            <p className="disclaimer-banner">
-              Proyecto demostrativo con datos ficticios y simulaciones ilustrativas. El
-              sistema nunca ejecuta órdenes reales ni promete rentabilidad: toda acción
-              sensible queda como propuesta sujeta a aprobación de un asesor humano.
-            </p>
-          </div>
-        </footer>
+          <footer className="border-t border-white/60 bg-white/50 backdrop-blur-md">
+            <div className="max-w-6xl mx-auto px-6 py-4 space-y-2.5">
+              <p className="disclaimer-banner">
+                Proyecto demostrativo con datos ficticios y simulaciones ilustrativas. El
+                sistema nunca ejecuta órdenes reales ni promete rentabilidad: toda acción
+                sensible queda como propuesta sujeta a aprobación de un asesor humano.
+              </p>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-success-500 animate-pulse" />
+                Todos los sistemas operativos
+              </div>
+            </div>
+          </footer>
+
+          <HelpWidget />
+        </ToastProvider>
       </body>
     </html>
   );

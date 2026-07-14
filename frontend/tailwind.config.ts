@@ -39,9 +39,25 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(14px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        "slide-in-right": {
+          "0%": { opacity: "0", transform: "translateX(24px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        pop: {
+          "0%": { opacity: "0", transform: "scale(0.6)" },
+          "60%": { opacity: "1", transform: "scale(1.08)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-400px 0" },
+          "100%": { backgroundPosition: "400px 0" },
+        },
       },
       animation: {
         rise: "rise 0.6s ease-out both",
+        "slide-in-right": "slide-in-right 0.35s cubic-bezier(0.25,0.1,0.25,1) both",
+        pop: "pop 0.5s cubic-bezier(0.34,1.56,0.64,1) both",
+        shimmer: "shimmer 1.6s ease-in-out infinite",
       },
       transitionTimingFunction: {
         ios: "cubic-bezier(0.25, 0.1, 0.25, 1)",
